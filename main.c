@@ -31,20 +31,26 @@ void jsrGetHistogram();
 void jsrGetProbability();
 void jsrGetThreshold();
 
-double jsrGetVariance1(int th);
-double jsrGetMean1(int th);
-double jsrGetWeight1(int th);
+void jsrGetWeight1(int th);
+void jsrGetMean1(int th);
+void jsrGetVariance1(int th);
 
-double jsrGetVariance2(int th);
-double jsrGetMean2(int th);
-double jsrGetWeight2(int th);
+void jsrGetWeight2(int th);
+void jsrGetMean2(int th);
+void jsrGetVariance2(int th);
 
 double jsrGetVariancew();
 
-int jsrKittler_th(int th);
-int jsrOtsu_th(int th);
-int jsrKurita_th(int th);
-int jsrMartinez_th(int th);
+void jsrKittler_th();
+void jsrOtsu_th();
+void jsrKurita_th();
+void jsrMartinez_th();
+
+double jsrKittler_vth();
+double jsrKurita_vth();
+double jsrOtsu_vth();
+
+void jsrImageSegmentation(int th);
 //  ------------------------------------------------------------------------------------------
 //  STRUCTS (CONTENEDORES)
 //  ------------------------------------------------------------------------------------------
@@ -76,6 +82,10 @@ struct contenedor_de_resultados{
     int th_kittler;
     int th_martinez;
 
+    double vth_kittler[256];
+    double vth_kurita[256];
+    double vth_otsu[256];
+
     double c1;
     double c2;
 
@@ -86,7 +96,17 @@ struct contenedor_de_resultados{
     double var2;
     double varw;
 
-    int N;
+//
+//    double pc1[256];
+//    double pc2[256];
+//
+//    double pmean1[256];
+//    double pmean2[256];
+//
+//    double pvar1[256];
+//    double pvar2[256];
+
+    int N; //Cantidad total de pixeles
 
     int hist[256]; //Para almacenar los valores del histograma de la imagen
     double prob[256]; //Para almacenar la probabilidad de cada color
@@ -194,18 +214,71 @@ void geoInsertYourCodeHere()
     jsrGetHistogram();
 
     printf("\nCantidad total de pixeles: %d \n",p_resultados->N);
-    printf("\nHistograma: \n");
-    int p;
-    for(p=0; p<256; p++){
-        printf("   h(%d) = %d\n", p, p_resultados->hist[p]);
-    }
+//    printf("\nHistograma: \n");
+//    int p;
+//    for(p=0; p<256; p++){
+//        printf("   h(%d) = %d\n", p, p_resultados->hist[p]);
+//    }
 
     jsrGetProbability();
-    printf("\nProbabilidad: \n");
-    int f;
-    for(f=0; f<256; f++){
-        printf("   p(%d) = %.10lf\n", f, p_resultados->prob[f]);
-    }
+//    printf("\nProbabilidad: \n");
+//    int f;
+//    for(f=0; f<256; f++){
+//        printf("   p(%d) = %.10lf\n", f, p_resultados->prob[f]);
+//    }
+
+//    int h; int j; int y; int t; int r; int a; int b;
+
+    jsrGetThreshold();
+//    printf("\nFuncion de verosimilitud Kittler: \n");
+//
+//    for(h=0; h<256; h++){
+//        printf("   v(%d) = %.10lf\n", h, p_resultados->vth_kittler[h]);
+//    }
+    printf("\n-----------------------------------------------------------\n");
+    printf("\nResultados segun el algoritmo de Kittler:");
+    printf("\n\n      Umbral optimo: %d\n", p_resultados->th_kittler);
+    printf("\n      Peso 1 = %.10lf", p_resultados->c1);
+    printf("\n      Peso 2 = %.10lf", p_resultados->c2);
+    printf("\n      Media 1 = %.10lf", p_resultados->mean1);
+    printf("\n      Media 2 = %.10lf", p_resultados->mean2);
+    printf("\n      Varianza 1 = %.10lf", p_resultados->var1);
+    printf("\n      Varianza 2 = %.10lf\n", p_resultados->var2);
+
+    jsrImageSegmentation(p_resultados->th_kittler);
+
+    strcpy(pathAndFileName,"output/imagenDeIntensidadSegmentada.bmp");
+    SaveIntensityImageIn_BMP_file(pInputImage->pthresholdedIntensity, pathAndFileName);
+//    printf("\nValores de c1 para cada th: \n");
+//    for(j=0; j<256; j++){
+//        printf("   c1(%d) = %.10lf\n", j, p_resultados->pc1[j]);
+//    }
+//    printf("\nValores de c2 para cada th: \n");
+//    for(y=0; y<256; y++){
+//        printf("   c2(%d) = %.10lf\n", y, p_resultados->pc2[y]);
+//    }
+//
+//    printf("\nValores de m1 para cada th: \n");
+//    for(t=0; t<256; t++){
+//        printf("   m1(%d) = %.10lf\n", t, p_resultados->pmean1[t]);
+//    }
+//
+//    printf("\nValores de m2 para cada th: \n");
+//    for(r=0; r<256; r++){
+//        printf("   m2(%d) = %.10lf\n", r, p_resultados->pmean2[r]);
+//    }
+//
+//    printf("\nValores de var1 para cada th: \n");
+//    for(a=0; a<256; a++){
+//        printf("   var1(%d) = %.10lf\n", a, p_resultados->pvar1[a]);
+//    }
+//
+//    printf("\nValores de var2 para cada th: \n");
+//    for(b=0; b<256; b++){
+//        printf("   var2(%d) = %.10lf\n", b, p_resultados->pvar2[b]);
+//    }
+
+
 
 }
 
@@ -251,81 +324,193 @@ void jsrGetProbability(){
 //  FUNCION PARA OBTENER EL UMBRAL OPTIMO th_op MEDIANTE EL METODO DE MARTINEZ
 //  ------------------------------------------------------------------------------------------
 void jsrGetThreshold(){
-    int x;
-    for(x=0;x<256;x++){
-        jsrKittler_th(x);
-    }
+    jsrKittler_th();
 }
 
-int jsrKittler_th(int th){
+//  ------------------------------------------------------------------------------------------
+//  FUNCION PARA OBTENER EL th_op SEGUN EL ALGORITMO DE KITTLER
+//  ------------------------------------------------------------------------------------------
 
+void jsrKittler_th(){
+    int th;
+    int k;
+    int e;
+    int i;
+    int j;
+
+    for(e=0; e<256; e++){
+        p_resultados->vth_kittler[e] = 0.0;
+    }
+    for(th=0; th<256; th++){
+//        double c1 = jsrGetWeight1(th); double c2 = jsrGetWeight2(th);
+//        double m1 = jsrGetMean1(th, c1); double m2 = jsrGetMean2(th, c2);
+//        double v1 = jsrGetVariance1(th, c1, m1); double v2 = jsrGetVariance2(th, c2, m2);
+//
+//        p_resultados->pc1[th] = c1;
+//        p_resultados->pc2[th] = c2;
+//
+//        p_resultados->pmean1[th] = m1;
+//        p_resultados->pmean2[th] = m2;
+//
+//        p_resultados->pvar1[th] = v1;
+//        p_resultados->pvar2[th] = v2;
+
+        jsrGetWeight1(th);
+        jsrGetWeight2(th);
+        jsrGetMean1(th);
+        jsrGetMean2(th);
+        jsrGetVariance1(th);
+        jsrGetVariance2(th);
+
+        p_resultados->vth_kittler[th] = jsrKittler_vth();
+    }
+//
+//    for(k=1; k<256; k++){
+//        if(p_resultados->vth_kittler[k] > p_resultados->vth_kittler[k-1]){
+//            th_op = k;
+//        }
+//    }
+//    p_resultados->th_kittler = th_op;
+    double aux;
+    double arregloaux[256];
+
+    for(k=0; k<256; k++){
+        arregloaux[k] = p_resultados->vth_kittler[k];
+    }
+
+    for (i=0; i<255; i++){
+        for (j=i+1; j<256; j++){
+            if(arregloaux[i]>arregloaux[j])
+            {
+             aux = arregloaux[i];
+             arregloaux[i] = arregloaux[j];
+             arregloaux[j] = aux;
+            }
+        }
+    }
+
+    int w = 255;
+    while( arregloaux[w]==0 ){
+        w--;
+    }
+
+    int th_op = 0;
+    while( p_resultados->vth_kittler[th_op] != arregloaux[w] ){
+        th_op++;
+    }
+    p_resultados->th_kittler = th_op;
+
+    jsrGetWeight1(th_op);
+    jsrGetWeight2(th_op);
+    jsrGetMean1(th_op);
+    jsrGetMean2(th_op);
+    jsrGetVariance1(th_op);
+    jsrGetVariance2(th_op);
+
+}
+
+//  ------------------------------------------------------------------------------------------
+//  FUNCION DE VEROSIMILITUD SEGUN EL ALGORITMO DE KITTLER
+//  ------------------------------------------------------------------------------------------
+
+
+double jsrKittler_vth(){
+    double vth=0.0;
+    if(p_resultados->c1!=0.0 && p_resultados->c2!=0.0 && p_resultados->var1!=0.0 && p_resultados->var2!=0){
+        vth = (double)(p_resultados->N)*( p_resultados->c1*log(p_resultados->c1)+p_resultados->c2*log(p_resultados->c2) -0.50*log(2*PI) -0.50*(p_resultados->c1*log(p_resultados->var1)+p_resultados->c2*log(p_resultados->var2)) -0.50 );
+        return vth;
+    }
+    else{return vth;}
 }
 
 //  ------------------------------------------------------------------------------------------
 //  FUNCION PARA OBTENER LOS PESOS c1 Y c2 CON EL UMBRAL ENVIADO th
 //  ------------------------------------------------------------------------------------------
-double jsrGetWeight1(int th){
+void jsrGetWeight1(int th){
     int n;
-    double c1=0;
+    p_resultados->c1=0.0;
     for(n=0; n<=th; n++){
-        c1 += p_resultados->prob[n];
+        p_resultados->c1 += p_resultados->prob[n];
     }
-    return c1;
 }
-double jsrGetWeight2(int th){
-    int d;
-    double c2=0;
-    for(d=th+1; d<256; d++){
-        c2 += p_resultados->prob[d];
+void jsrGetWeight2(int th){
+    int n;
+    p_resultados->c2=0.0;
+    for(n=th+1; n<256; n++){
+        p_resultados->c2 += p_resultados->prob[n];
     }
-    return c2;
 }
 
 //  ------------------------------------------------------------------------------------------
 //  FUNCION PARA OBTENER LAS MEDIAS m1 Y m2 CON EL UMBRAL ENVIADO th
 //  ------------------------------------------------------------------------------------------
-double jsrGetMean1(int th){
-    int h;
-    double m1=0;
-    for(h=0; h<=th; h++){
-        m1 += (h*p_resultados->prob[h]);
+void jsrGetMean1(int th){
+    int n;
+    p_resultados->mean1=0.0;
+    if(p_resultados->c1 != 0.0){
+        for(n=0; n<=th; n++){
+            p_resultados->mean1 += (n*p_resultados->prob[n]);
+        }
+        p_resultados->mean1 = p_resultados->mean1/p_resultados->c1;
     }
-    m1 = m1/p_resultados->c1;
-    return m1;
 }
-double jsrGetMean2(int th){
-    int h;
-    double m2=0;
-    for(h=th+1; h<256; h++){
-        m2 += (h*p_resultados->prob[h]);
+void jsrGetMean2(int th){
+    int n;
+    p_resultados->mean2=0.0;
+    if(p_resultados->c2!=0.0){
+        for(n=th+1; n<256; n++){
+            p_resultados->mean2 += (n*p_resultados->prob[n]);
+        }
+        p_resultados->mean2 = p_resultados->mean2/p_resultados->c2;
     }
-    m2 = m2/p_resultados->c2;
-    return m2;
-
 }
 //  ------------------------------------------------------------------------------------------
 //  FUNCION PARA OBTENER LAS VARIANZAS var1 Y var2 CON EL UMBRAL ENVIADO th
 //  ------------------------------------------------------------------------------------------
-double jsrGetVariance1(int th){
-    int h;
-    double var1=0;
-    for(h=0; h<=th; h++){
-        var1 += pow(h-p_resultados->mean1,2)*p_resultados->prob[h];
+void jsrGetVariance1(int th){
+    int n;
+    p_resultados->var1=0.0;
+    if(p_resultados->c1!=0.0){
+        for(n=0; n<=th; n++){
+            p_resultados->var1 += (n-p_resultados->mean1)*(n-p_resultados->mean1)*p_resultados->prob[n];
+        }
+        p_resultados->var1 = p_resultados->var1/p_resultados->c1;
     }
-    var1 = var1/p_resultados->c1;
-    return var1;
 }
-double jsrGetVariance2(int th){
-    int h;
-    double var2=0;
-    for(h=th; h<256; h++){
-        var2 += pow(h-p_resultados->mean2,2)*p_resultados->prob[h];
+void jsrGetVariance2(int th){
+    int n;
+    p_resultados->var2=0.0;
+    if(p_resultados->c2!=0.0){
+        for(n=th+1; n<256; n++){
+            p_resultados->var2 += (n-p_resultados->mean2)*(n-p_resultados->mean2)*p_resultados->prob[n];
+        }
+        p_resultados->var2 = p_resultados->var2/p_resultados->c2;
     }
-    var2 = var2/p_resultados->c2;
-    return var2;
 }
 
+//  ------------------------------------------------------------------------------------------
+//  FUNCION PARA OBTENER LA VARIANZA varw CON EL UMBRAL ENVIADO th PARA EL ALGORITMO DE KURITA
+//  ------------------------------------------------------------------------------------------
+double jsrGetVariancew(){
+    double varw;
+    varw = p_resultados->c1*p_resultados->var1 + p_resultados->c2*p_resultados->var2;
+    return varw;
+}
 
+//  ------------------------------------------------------------------------------------------
+//  FUNCION PARA SEGMENTAR LA IMAGEN CON UN VALOR DE UMBRALIZACION th
+//  ------------------------------------------------------------------------------------------
+void jsrImageSegmentation(int th){
+    int n;
+    for(n=0;n<p_resultados->N;n++){
+        if(pInputImage->pintensity[n]<=(unsigned char)th){
+            pInputImage->pthresholdedIntensity[n] = 255;
+        }
+        else{
+            pInputImage->pthresholdedIntensity[n] = 0;
+        }
+    }
+}
 //  ------------------------------------------------------------------------------------------
 //  ------------------------------------------------------------------------------------------
 //  ------------------------------------------------------------------------------------------
