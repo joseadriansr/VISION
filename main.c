@@ -26,6 +26,7 @@ void geoSaveIntensityImageIn_YUV400_file(unsigned char *pIntensity, char* filena
 void geoChangeImageCoordinateSystemFromLowerLeftSideToUpperLeftSide(unsigned char *pIntensity, unsigned char *presult);
 int SaveIntensityImageIn_BMP_file(unsigned char *pintensity, char *filename);
 int SaveRGBImageIn_BMP_file(unsigned char *prgb, char *filename);
+void geoSalvarResultadosEnArchivoDeTexto();
 
 void jsrGetHistogram();
 void jsrGetProbability();
@@ -39,7 +40,7 @@ void jsrGetWeight2(int th);
 void jsrGetMean2(int th);
 void jsrGetVariance2(int th);
 
-double jsrGetVariancew();
+void jsrGetVariancew();
 
 void jsrKittler_th();
 void jsrOtsu_th();
@@ -51,6 +52,11 @@ double jsrKurita_vth();
 double jsrOtsu_vth();
 
 void jsrImageSegmentation(int th);
+
+double jsrMartinez_pmKurita(int n);
+double jsrMartinez_pmOtsu(int n);
+double jsrMartinez_pmKittler(int n);
+void jsrMartinez_mse();
 //  ------------------------------------------------------------------------------------------
 //  STRUCTS (CONTENEDORES)
 //  ------------------------------------------------------------------------------------------
@@ -96,20 +102,18 @@ struct contenedor_de_resultados{
     double var2;
     double varw;
 
-//
-//    double pc1[256];
-//    double pc2[256];
-//
-//    double pmean1[256];
-//    double pmean2[256];
-//
-//    double pvar1[256];
-//    double pvar2[256];
-
     int N; //Cantidad total de pixeles
 
     int hist[256]; //Para almacenar los valores del histograma de la imagen
     double prob[256]; //Para almacenar la probabilidad de cada color
+
+    double pmKurita[256];
+    double pmKittler[256];
+    double pmOtsu[256];
+
+    double mseKurita;
+    double mseKittler;
+    double mseOtsu;
 
 };
 
@@ -189,6 +193,7 @@ int main()
     free(pInputImage->pthresholdedIntensity);
     free(pInputImage);
     free(p_parametros);
+    free(p_resultados);
 
     return 0;
 }
@@ -200,8 +205,9 @@ int main()
 void geoInsertYourCodeHere()
 {
     char pathAndFileName[256];
-    strcpy(pathAndFileName,"output/rgb.bmp");
-    SaveRGBImageIn_BMP_file(pInputImage->prgb, pathAndFileName);
+
+//    strcpy(pathAndFileName,"output/rgb.bmp");
+//    SaveRGBImageIn_BMP_file(pInputImage->prgb, pathAndFileName);
 
     //Calculando la imagen de intensidad
     geoGetIntensityImageFromRGBimage();
@@ -211,9 +217,9 @@ void geoInsertYourCodeHere()
     strcpy(pathAndFileName,"output/imagenDeIntensidad.bmp");
     SaveIntensityImageIn_BMP_file(pInputImage->pintensity, pathAndFileName);
 
-    jsrGetHistogram();
-
     printf("\nCantidad total de pixeles: %d \n",p_resultados->N);
+
+    jsrGetHistogram();
 //    printf("\nHistograma: \n");
 //    int p;
 //    for(p=0; p<256; p++){
@@ -227,15 +233,9 @@ void geoInsertYourCodeHere()
 //        printf("   p(%d) = %.10lf\n", f, p_resultados->prob[f]);
 //    }
 
-//    int h; int j; int y; int t; int r; int a; int b;
+    jsrKittler_th();
 
-    jsrGetThreshold();
-//    printf("\nFuncion de verosimilitud Kittler: \n");
-//
-//    for(h=0; h<256; h++){
-//        printf("   v(%d) = %.10lf\n", h, p_resultados->vth_kittler[h]);
-//    }
-    printf("\n-----------------------------------------------------------\n");
+    printf("\n------------------------------------------------------------------\n");
     printf("\nResultados segun el algoritmo de Kittler:");
     printf("\n\n      Umbral optimo: %d\n", p_resultados->th_kittler);
     printf("\n      Peso 1 = %.10lf", p_resultados->c1);
@@ -247,39 +247,61 @@ void geoInsertYourCodeHere()
 
     jsrImageSegmentation(p_resultados->th_kittler);
 
-    strcpy(pathAndFileName,"output/imagenDeIntensidadSegmentada.bmp");
+    strcpy(pathAndFileName,"output/imagenSegmentadaKittler.bmp");
     SaveIntensityImageIn_BMP_file(pInputImage->pthresholdedIntensity, pathAndFileName);
-//    printf("\nValores de c1 para cada th: \n");
-//    for(j=0; j<256; j++){
-//        printf("   c1(%d) = %.10lf\n", j, p_resultados->pc1[j]);
-//    }
-//    printf("\nValores de c2 para cada th: \n");
-//    for(y=0; y<256; y++){
-//        printf("   c2(%d) = %.10lf\n", y, p_resultados->pc2[y]);
-//    }
-//
-//    printf("\nValores de m1 para cada th: \n");
-//    for(t=0; t<256; t++){
-//        printf("   m1(%d) = %.10lf\n", t, p_resultados->pmean1[t]);
-//    }
-//
-//    printf("\nValores de m2 para cada th: \n");
-//    for(r=0; r<256; r++){
-//        printf("   m2(%d) = %.10lf\n", r, p_resultados->pmean2[r]);
-//    }
-//
-//    printf("\nValores de var1 para cada th: \n");
-//    for(a=0; a<256; a++){
-//        printf("   var1(%d) = %.10lf\n", a, p_resultados->pvar1[a]);
-//    }
-//
-//    printf("\nValores de var2 para cada th: \n");
-//    for(b=0; b<256; b++){
-//        printf("   var2(%d) = %.10lf\n", b, p_resultados->pvar2[b]);
-//    }
 
+    jsrKurita_th();
 
+    printf("\n------------------------------------------------------------------\n");
+    printf("\nResultados segun el algoritmo de Kurita:");
+    printf("\n\n      Umbral optimo: %d\n", p_resultados->th_kurita);
+    printf("\n      Peso 1 = %.10lf", p_resultados->c1);
+    printf("\n      Peso 2 = %.10lf", p_resultados->c2);
+    printf("\n      Media 1 = %.10lf", p_resultados->mean1);
+    printf("\n      Media 2 = %.10lf", p_resultados->mean2);
+    printf("\n      Varianza 1 = %.10lf", p_resultados->var1);
+    printf("\n      Varianza 2 = %.10lf\n", p_resultados->var2);
+    printf("\n      Varianza w = %.10lf\n", p_resultados->varw);
 
+    jsrImageSegmentation(p_resultados->th_kurita);
+
+    strcpy(pathAndFileName,"output/imagenSegmentadaKurita.bmp");
+    SaveIntensityImageIn_BMP_file(pInputImage->pthresholdedIntensity, pathAndFileName);
+
+    jsrOtsu_th();
+
+    printf("\n------------------------------------------------------------------\n");
+    printf("\nResultados segun el algoritmo de Otsu:");
+    printf("\n\n      Umbral optimo: %d\n", p_resultados->th_otsu);
+    printf("\n      Peso 1 = %.10lf", p_resultados->c1);
+    printf("\n      Peso 2 = %.10lf", p_resultados->c2);
+    printf("\n      Media 1 = %.10lf", p_resultados->mean1);
+    printf("\n      Media 2 = %.10lf", p_resultados->mean2);
+    printf("\n      Varianza 1 = %.10lf", p_resultados->var1);
+    printf("\n      Varianza 2 = %.10lf\n", p_resultados->var2);
+    printf("\n      Varianza w = %.10lf\n", p_resultados->varw);
+
+    jsrImageSegmentation(p_resultados->th_otsu);
+
+    strcpy(pathAndFileName,"output/imagenSegmentadaOtsu.bmp");
+    SaveIntensityImageIn_BMP_file(pInputImage->pthresholdedIntensity, pathAndFileName);
+
+    jsrMartinez_th();
+
+    printf("\n------------------------------------------------------------------\n");
+    printf("\nResultados segun el metodo del Prof.Dr.Ing.Geovanni Martinez:");
+    if(p_resultados->th_martinez==p_resultados->th_kittler){
+        printf("\n\n      El umbral optimo corresponde al umbral segun Kittler: %d\n", p_resultados->th_martinez);
+    }
+    else if(p_resultados->th_martinez==p_resultados->th_kurita){
+        printf("\n\n      El umbral optimo corresponde al umbral segun Kurita: %d\n", p_resultados->th_martinez);
+    }
+    else if(p_resultados->th_martinez==p_resultados->th_otsu){
+        printf("\n\n      El umbral optimo corresponde al umbral segun Otsu: %d\n", p_resultados->th_martinez);
+    }
+    printf("\n------------------------------------------------------------------\n");
+
+    geoSalvarResultadosEnArchivoDeTexto();
 }
 
 //  ------------------------------------------------------------------------------------------
@@ -290,14 +312,12 @@ void geoInsertYourCodeHere()
 //  ------------------------------------------------------------------------------------------
 //  ------------------------------------------------------------------------------------------
 
-
 //  ------------------------------------------------------------------------------------------
 //  FUNCION PARA OBTENER EL HISTOGRAMA DE LA IMAGEN DE INTENSIDAD
 //  ------------------------------------------------------------------------------------------
 void jsrGetHistogram(){
-    int k;
-    int q;
-    int g;
+    printf("\nCalculando histograma h(n) ...");
+    int k; int q; int g; //Variables auxiliares
     for(g=0; g<256; g++){
         p_resultados->hist[g]=0;
     }
@@ -314,6 +334,7 @@ void jsrGetHistogram(){
 //  FUNCION PARA OBTENER LA PROBABILIDAD p(n) DE CADA ELEMENTO DE LA IMAGEN
 //  ------------------------------------------------------------------------------------------
 void jsrGetProbability(){
+    printf("\nCalculando las probabilidades p(n) ...");
     int k;
     for(k=0; k<256; k++){
         p_resultados->prob[k] = (double)p_resultados->hist[k]/(double)p_resultados->N;
@@ -325,36 +346,21 @@ void jsrGetProbability(){
 //  ------------------------------------------------------------------------------------------
 void jsrGetThreshold(){
     jsrKittler_th();
+    jsrKurita_th();
+    jsrOtsu_th();
+
+
 }
 
 //  ------------------------------------------------------------------------------------------
 //  FUNCION PARA OBTENER EL th_op SEGUN EL ALGORITMO DE KITTLER
 //  ------------------------------------------------------------------------------------------
-
 void jsrKittler_th(){
-    int th;
-    int k;
-    int e;
-    int i;
-    int j;
+    int th; int k; int e; int i; int j; //Variables auxiliares
 
-    for(e=0; e<256; e++){
-        p_resultados->vth_kittler[e] = 0.0;
-    }
+    for(e=0; e<256; e++){p_resultados->vth_kittler[e] = 0.0;} //Inicializando el arreglo que contiene v(th)
+    //Probando el algoritmo para todos los valores de th
     for(th=0; th<256; th++){
-//        double c1 = jsrGetWeight1(th); double c2 = jsrGetWeight2(th);
-//        double m1 = jsrGetMean1(th, c1); double m2 = jsrGetMean2(th, c2);
-//        double v1 = jsrGetVariance1(th, c1, m1); double v2 = jsrGetVariance2(th, c2, m2);
-//
-//        p_resultados->pc1[th] = c1;
-//        p_resultados->pc2[th] = c2;
-//
-//        p_resultados->pmean1[th] = m1;
-//        p_resultados->pmean2[th] = m2;
-//
-//        p_resultados->pvar1[th] = v1;
-//        p_resultados->pvar2[th] = v2;
-
         jsrGetWeight1(th);
         jsrGetWeight2(th);
         jsrGetMean1(th);
@@ -362,26 +368,17 @@ void jsrKittler_th(){
         jsrGetVariance1(th);
         jsrGetVariance2(th);
 
-        p_resultados->vth_kittler[th] = jsrKittler_vth();
+        p_resultados->vth_kittler[th] = jsrKittler_vth(); //Guardando todos los valores de v(th)
     }
-//
-//    for(k=1; k<256; k++){
-//        if(p_resultados->vth_kittler[k] > p_resultados->vth_kittler[k-1]){
-//            th_op = k;
-//        }
-//    }
-//    p_resultados->th_kittler = th_op;
+
+    //Arreglo y variable auxiliar para encontrar el th_op
     double aux;
     double arregloaux[256];
-
-    for(k=0; k<256; k++){
-        arregloaux[k] = p_resultados->vth_kittler[k];
-    }
-
+    //Ordenando el arreglo auxiliar
+    for(k=0; k<256; k++){arregloaux[k] = p_resultados->vth_kittler[k];}
     for (i=0; i<255; i++){
         for (j=i+1; j<256; j++){
-            if(arregloaux[i]>arregloaux[j])
-            {
+            if(arregloaux[i]>arregloaux[j]){
              aux = arregloaux[i];
              arregloaux[i] = arregloaux[j];
              arregloaux[j] = aux;
@@ -390,16 +387,13 @@ void jsrKittler_th(){
     }
 
     int w = 255;
-    while( arregloaux[w]==0 ){
-        w--;
-    }
+    while( arregloaux[w]==0 ){w--;} //Encontrando el mayor valor de v(th)
 
     int th_op = 0;
-    while( p_resultados->vth_kittler[th_op] != arregloaux[w] ){
-        th_op++;
-    }
-    p_resultados->th_kittler = th_op;
+    while( p_resultados->vth_kittler[th_op] != arregloaux[w] ){th_op++;} //Encontrando el th_op
 
+    //Almacenando los resultados optenido con el th_op en el contenedor de resultados
+    p_resultados->th_kittler = th_op;
     jsrGetWeight1(th_op);
     jsrGetWeight2(th_op);
     jsrGetMean1(th_op);
@@ -412,12 +406,149 @@ void jsrKittler_th(){
 //  ------------------------------------------------------------------------------------------
 //  FUNCION DE VEROSIMILITUD SEGUN EL ALGORITMO DE KITTLER
 //  ------------------------------------------------------------------------------------------
-
-
 double jsrKittler_vth(){
     double vth=0.0;
-    if(p_resultados->c1!=0.0 && p_resultados->c2!=0.0 && p_resultados->var1!=0.0 && p_resultados->var2!=0){
-        vth = (double)(p_resultados->N)*( p_resultados->c1*log(p_resultados->c1)+p_resultados->c2*log(p_resultados->c2) -0.50*log(2*PI) -0.50*(p_resultados->c1*log(p_resultados->var1)+p_resultados->c2*log(p_resultados->var2)) -0.50 );
+    //Si no hay valores que indefinan los logaritmos se procede con la operacion
+    if(p_resultados->c1!=0.0 && p_resultados->c2!=0.0 && p_resultados->var1!=0.0 && p_resultados->var2!=0.0){
+        vth = (double)(p_resultados->N)*( p_resultados->c1*log(p_resultados->c1)+p_resultados->c2*log(p_resultados->c2) -0.50*log(2.0*PI) -0.50*(p_resultados->c1*log(p_resultados->var1)+p_resultados->c2*log(p_resultados->var2)) -0.50 );
+        return vth;
+    }
+    else{return vth;}
+}
+
+//  ------------------------------------------------------------------------------------------
+//  FUNCION PARA OBTENER EL th_op SEGUN EL ALGORITMO DE KURITA
+//  ------------------------------------------------------------------------------------------
+void jsrKurita_th(){
+    int th; int k; int e; int i; int j; //Variables auxiliares
+
+    for(e=0; e<256; e++){ p_resultados->vth_kurita[e] = 0.0; } //Inicializando el arreglo que contiene v(th)
+    //Probando el algoritmo para todos los valores de th
+    for(th=0; th<256; th++){
+        jsrGetWeight1(th);
+        jsrGetWeight2(th);
+        jsrGetMean1(th);
+        jsrGetMean2(th);
+        jsrGetVariance1(th);
+        jsrGetVariance2(th);
+        jsrGetVariancew();
+
+        p_resultados->vth_kurita[th] = jsrKurita_vth(); //Guardando todos los valores de v(th)
+    }
+    //Arreglo y variable auxiliar para encontrar el th_op
+    double aux;
+    double arregloaux[256];
+
+    for(k=0; k<256; k++){ arregloaux[k] = p_resultados->vth_kurita[k];}
+
+    //Ordenando el arreglo auxiliar
+    for (i=0; i<255; i++){
+        for (j=i+1; j<256; j++){
+            if(arregloaux[i]>arregloaux[j])
+            {
+             aux = arregloaux[i];
+             arregloaux[i] = arregloaux[j];
+             arregloaux[j] = aux;
+            }
+        }
+    }
+
+    int w = 255;
+    while( arregloaux[w]==0 ){ w--;} //Encontrando el mayor valor de v(th)
+
+    int th_op = 0;
+    while( p_resultados->vth_kurita[th_op] != arregloaux[w] ){ th_op++;} //Encontrando el th_op
+
+    //Almacenando los resultados optenido con el th_op en el contenedor de resultados
+    p_resultados->th_kurita = th_op;
+    jsrGetWeight1(th_op);
+    jsrGetWeight2(th_op);
+    jsrGetMean1(th_op);
+    jsrGetMean2(th_op);
+    jsrGetVariance1(th_op);
+    jsrGetVariance2(th_op);
+    jsrGetVariancew();
+
+}
+
+//  ------------------------------------------------------------------------------------------
+//  FUNCION DE VEROSIMILITUD SEGUN EL ALGORITMO DE KURITA
+//  ------------------------------------------------------------------------------------------
+double jsrKurita_vth(){
+    double vth=0.0;
+    if(p_resultados->c1!=0.0 && p_resultados->c2!=0.0 && p_resultados->var1!=0.0 && p_resultados->varw!=0.0 && p_resultados->var2!=0.0){
+        vth = (double)(p_resultados->N)*( p_resultados->c1*log(p_resultados->c1)+p_resultados->c2*log(p_resultados->c2) -0.50*log(2*PI) -0.50*log(p_resultados->varw) -0.50 );
+        return vth;
+    }
+    else{return vth;}
+}
+
+//  ------------------------------------------------------------------------------------------
+//  FUNCION PARA OBTENER EL th_op SEGUN EL ALGORITMO DE otsu
+//  ------------------------------------------------------------------------------------------
+void jsrOtsu_th(){
+    int th; int k; int e; int i; int j; //Variables auxiliares
+
+    for(e=0; e<256; e++){ p_resultados->vth_otsu[e] = 0.0; } //Inicializando el arreglo que contiene v(th)
+    //Probando el algoritmo para todos los valores de th
+    for(th=0; th<256; th++){
+        jsrGetWeight1(th);
+        jsrGetWeight2(th);
+        jsrGetMean1(th);
+        jsrGetMean2(th);
+        jsrGetVariance1(th);
+        jsrGetVariance2(th);
+        jsrGetVariancew();
+
+        p_resultados->vth_otsu[th] = -1.0*jsrOtsu_vth(); //Guardando todos los valores de v(th)
+//        printf("\nv(%d)= %.10lf\n", th, p_resultados->vth_otsu[th]);
+    }
+    //Arreglo y variable auxiliar para encontrar el th_op
+    double aux;
+    double arregloaux[256];
+
+    for(k=0; k<256; k++){ arregloaux[k] = p_resultados->vth_otsu[k];}
+
+    //Ordenando el arreglo auxiliar
+    for (i=0; i<255; i++){
+        for (j=i+1; j<256; j++){
+            if(arregloaux[i]>arregloaux[j])
+            {
+             aux = arregloaux[i];
+             arregloaux[i] = arregloaux[j];
+             arregloaux[j] = aux;
+            }
+        }
+    }
+
+//    int l;
+//    for(l=0;l<256;l++){printf("\narregloaux(%d)= %.10lf\n", l, arregloaux[l]);}
+
+    int w = 255;
+    while( arregloaux[w]==0 ){ w--;} //Encontrando el mayor valor de v(th)
+
+    int th_op = 0;
+    while( p_resultados->vth_otsu[th_op] != arregloaux[w] ){ th_op++;} //Encontrando el th_op
+
+    //Almacenando los resultados optenido con el th_op en el contenedor de resultados
+    p_resultados->th_otsu = th_op;
+    jsrGetWeight1(th_op);
+    jsrGetWeight2(th_op);
+    jsrGetMean1(th_op);
+    jsrGetMean2(th_op);
+    jsrGetVariance1(th_op);
+    jsrGetVariance2(th_op);
+    jsrGetVariancew();
+
+}
+
+//  ------------------------------------------------------------------------------------------
+//  FUNCION DE VEROSIMILITUD SEGUN EL ALGORITMO DE OTSU
+//  ------------------------------------------------------------------------------------------
+double jsrOtsu_vth(){
+    double vth=0.0;
+    if(p_resultados->c1!=0.0 && p_resultados->c2!=0.0 && p_resultados->var1!=0.0 && p_resultados->varw!=0.0 && p_resultados->var2!=0.0){
+        vth = (double)(p_resultados->N)*(-0.50)*( log(2.0*PI)-1.0*log(p_resultados->varw)-1.0 );
         return vth;
     }
     else{return vth;}
@@ -489,12 +620,10 @@ void jsrGetVariance2(int th){
 }
 
 //  ------------------------------------------------------------------------------------------
-//  FUNCION PARA OBTENER LA VARIANZA varw CON EL UMBRAL ENVIADO th PARA EL ALGORITMO DE KURITA
+//  FUNCION PARA OBTENER LA VARIANZA varw CON EL UMBRAL ENVIADO th PARA EL ALGORITMO DE KURITA Y OTSU
 //  ------------------------------------------------------------------------------------------
-double jsrGetVariancew(){
-    double varw;
-    varw = p_resultados->c1*p_resultados->var1 + p_resultados->c2*p_resultados->var2;
-    return varw;
+void jsrGetVariancew(){
+    p_resultados->varw = p_resultados->c1*p_resultados->var1 + p_resultados->c2*p_resultados->var2;
 }
 
 //  ------------------------------------------------------------------------------------------
@@ -504,13 +633,99 @@ void jsrImageSegmentation(int th){
     int n;
     for(n=0;n<p_resultados->N;n++){
         if(pInputImage->pintensity[n]<=(unsigned char)th){
-            pInputImage->pthresholdedIntensity[n] = 255;
+            pInputImage->pthresholdedIntensity[n] = 0;
         }
         else{
-            pInputImage->pthresholdedIntensity[n] = 0;
+            pInputImage->pthresholdedIntensity[n] = 255;
         }
     }
 }
+
+//  ------------------------------------------------------------------------------------------
+//  MODELO DE POBLACION MIXTA ASOCIADO CON LOS UMBRALES
+//  ------------------------------------------------------------------------------------------
+double jsrMartinez_pmKurita(int n){
+    double pm = 0.0;
+    double aux1; double aux2; double aux3; double aux4;
+    if(p_resultados->c1!=0.0 && p_resultados->c2!=0.0 && p_resultados->var1!=0.0 && p_resultados->varw!=0.0 && p_resultados->var2!=0.0){
+        aux1 =  ( (p_resultados->c1)*(double)p_resultados->th_kurita )/( sqrt( 2.0*PI*p_resultados->varw*(double)p_resultados->th_kurita ) );
+        aux2 = exp( (-1.0*((double)n-(p_resultados->mean1*(double)p_resultados->th_kurita))*((double)n-p_resultados->mean1*(double)p_resultados->th_kurita))/(2.0*p_resultados->varw*(double)p_resultados->th_kurita));
+        aux3 =  ( (p_resultados->c2)*(double)p_resultados->th_kurita )/( sqrt( 2.0*PI*p_resultados->varw*(double)p_resultados->th_kurita ) );
+        aux4 = exp( (-1.0*((double)n-(p_resultados->mean2*(double)p_resultados->th_kurita))*((double)n-p_resultados->mean2*(double)p_resultados->th_kurita))/(2.0*p_resultados->varw*(double)p_resultados->th_kurita));
+        pm = aux1*aux2 + aux3*aux4;
+        return pm;
+    }
+    return pm;
+}
+double jsrMartinez_pmOtsu(int n){
+    double pm = 0.0;
+    double aux1; double aux2; double aux3; double aux4;
+    if(p_resultados->c1!=0.0 && p_resultados->c2!=0.0 && p_resultados->var1!=0.0 && p_resultados->varw!=0.0 && p_resultados->var2!=0.0){
+        aux1 =  ( (p_resultados->c1)*(double)p_resultados->th_otsu )/( sqrt( 2.0*PI*p_resultados->varw*(double)p_resultados->th_otsu ) );
+        aux2 = exp( (-1.0*((double)n-(p_resultados->mean1*(double)p_resultados->th_otsu))*((double)n-p_resultados->mean1*(double)p_resultados->th_otsu))/(2.0*p_resultados->varw*(double)p_resultados->th_otsu));
+        aux3 =  ( (p_resultados->c2)*(double)p_resultados->th_otsu )/( sqrt( 2.0*PI*p_resultados->varw*(double)p_resultados->th_otsu ) );
+        aux4 = exp( (-1.0*((double)n-(p_resultados->mean2*(double)p_resultados->th_otsu))*((double)n-p_resultados->mean2*(double)p_resultados->th_otsu))/(2.0*p_resultados->varw*(double)p_resultados->th_otsu));
+        pm = aux1*aux2 + aux3*aux4;
+        return pm;
+    }
+    return pm;
+}
+double jsrMartinez_pmKittler(int n){
+    double pm = 0.0;
+    double aux1; double aux2; double aux3; double aux4;
+    if(p_resultados->c1!=0.0 && p_resultados->c2!=0.0 && p_resultados->var1!=0.0 && p_resultados->varw!=0.0 && p_resultados->var2!=0.0){
+        aux1 =  ( (p_resultados->c1)*(double)p_resultados->th_kittler )/( sqrt( 2.0*PI*p_resultados->var1*(double)p_resultados->th_kittler ) );
+        aux2 = exp( (-1.0*((double)n-(p_resultados->mean1*(double)p_resultados->th_kittler))*((double)n-p_resultados->mean1*(double)p_resultados->th_kittler))/(2.0*p_resultados->var1*(double)p_resultados->th_kittler));
+        aux3 =  ( (p_resultados->c2)*(double)p_resultados->th_kittler )/( sqrt( 2.0*PI*p_resultados->var2*(double)p_resultados->th_kittler ) );
+        aux4 = exp( (-1.0*((double)n-(p_resultados->mean2*(double)p_resultados->th_kittler))*((double)n-p_resultados->mean2*(double)p_resultados->th_kittler))/(2.0*p_resultados->var2*(double)p_resultados->th_kittler));
+        pm = aux1*aux2 + aux3*aux4;
+        return pm;
+    }
+    return pm;
+}
+
+//  ------------------------------------------------------------------------------------------
+//  FUNCION PARA ENCONTRAR EL th_op SEGUN EL METODO DE MARTINEZ
+//  ------------------------------------------------------------------------------------------
+void jsrMartinez_th(){
+    jsrMartinez_mse();
+    p_resultados->th_martinez=0;
+    if(p_resultados->mseKittler <= p_resultados->mseKurita && p_resultados->mseKittler <= p_resultados->mseOtsu){
+        p_resultados->th_martinez = p_resultados->th_kittler;
+    }
+    else if(p_resultados->mseKurita <= p_resultados->mseKittler && p_resultados->mseKurita <= p_resultados->mseOtsu){
+        p_resultados->th_martinez = p_resultados->th_kurita;
+    }
+    else if(p_resultados->mseOtsu <= p_resultados->mseKittler && p_resultados->mseOtsu <= p_resultados->mseKurita){
+        p_resultados->th_martinez = p_resultados->th_otsu;
+    }
+}
+
+//  ------------------------------------------------------------------------------------------
+//  FUNCION PARA ENCONTRAR EL ERROR CUADRATICO MEDIO mse DE CADA MODELO DE POBLACION MIXTA
+//  ------------------------------------------------------------------------------------------
+void jsrMartinez_mse(){
+    int a; int b; int c; int n;
+    for(a=0; a<256; a++){
+        p_resultados->pmKurita[a] = jsrMartinez_pmKurita(a);
+    }
+    for(b=0; b<256; b++){
+        p_resultados->pmKittler[b] = jsrMartinez_pmKittler(b);
+    }
+    for(c=0; c<256; c++){
+        p_resultados->pmOtsu[c] = jsrMartinez_pmOtsu(c);
+    }
+    p_resultados->mseKittler=0.0; p_resultados->mseKurita=0.0; p_resultados->mseOtsu=0.0;
+    for(n=0; n<256; n++){
+        p_resultados->mseKittler += (p_resultados->pmKittler[n]-p_resultados->prob[n])*(p_resultados->pmKittler[n]-p_resultados->prob[n]);
+        p_resultados->mseKurita += (p_resultados->pmKurita[n]-p_resultados->prob[n])*(p_resultados->pmKurita[n]-p_resultados->prob[n]);
+        p_resultados->mseOtsu += (p_resultados->pmOtsu[n]-p_resultados->prob[n])*(p_resultados->pmOtsu[n]-p_resultados->prob[n]);
+    }
+    p_resultados->mseKittler = p_resultados->mseKittler/256.0;
+    p_resultados->mseKurita = p_resultados->mseKurita/256.0;
+    p_resultados->mseOtsu = p_resultados->mseOtsu/256.0;
+}
+
 //  ------------------------------------------------------------------------------------------
 //  ------------------------------------------------------------------------------------------
 //  ------------------------------------------------------------------------------------------
@@ -553,7 +768,9 @@ void geoLeerParametrosDeControlDeArchivoDeTexto()
     printf("Leyendo los datos de entrada:\n");
 
     //Abriendo archivo en mode de lectura
-    char nombreDeArchivo[256]="current_control_parameters.txt";
+//    char nombreDeArchivo[256]="current_control_parameters.txt";  //Para la imagen del cuadro
+//    char nombreDeArchivo[256]="current_control_parameters1.txt"; //Para la imagen de Claire
+    char nombreDeArchivo[256]="current_control_parameters2.txt"; //Para la imagen de las palmeras
     archivo = fopen(nombreDeArchivo, "r");
     if (!archivo) {
         printf("No se pudo abrir el archivo: current_control_parameters.txt\n");
@@ -614,6 +831,82 @@ void geoLeerParametrosDeControlDeArchivoDeTexto()
 //  FUNCIONES DE LECTURA Y ESCRITURA DE IMAGENES
 //  ------------------------------------------------------------------------------------------
 //  ------------------------------------------------------------------------------------------
+
+void geoSalvarResultadosEnArchivoDeTexto()
+{
+    FILE *archivo;
+    //Abriendo archivo en modo de escritura
+    char nombreDeArchivo[256]="output/resultadosOptimos.txt";
+    archivo = fopen(nombreDeArchivo, "w");
+    if (!archivo) {
+        printf("No se pudo abrir el archivo: resultados.txt\n");
+        exit(1);
+    }
+
+    fprintf(archivo,"===========================================================================\n");
+    fprintf(archivo,"** II EXAMEN PROGRAMADO                                                  **\n");
+    fprintf(archivo,"** JOSE ADRIAN SANABRIA ROSELLO - B46420                                 **\n");
+    fprintf(archivo,"===========================================================================\n");
+    fprintf(archivo,"** Basado en el programa:                                                **\n");
+    fprintf(archivo,"** visionPorComputador_Prog_Ref_No1                                      **\n");
+    fprintf(archivo,"** Prof. Dr.-Ing. Geovanni Martínez - IPCV-LAB                           **\n");
+    fprintf(archivo,"** II-2017                                                               **\n");
+    fprintf(archivo,"** Versión v004, 24 Octubre 2017, 11:30                                  **\n");
+    fprintf(archivo,"===========================================================================\n");
+    fprintf(archivo,"                            ARCHIVO DE RESULTADOS                          \n");
+    fprintf(archivo,"===========================================================================\n");
+
+    fprintf(archivo,"\nCantidad total de pixeles: %d \n",p_resultados->N);
+
+    fprintf(archivo,"\n------------------------------------------------------------------\n");
+    fprintf(archivo,"\nResultados segun el algoritmo de Kittler:");
+    fprintf(archivo,"\n\n      Umbral optimo: %d\n", p_resultados->th_kittler);
+    fprintf(archivo,"\n      Peso 1 = %.10lf", p_resultados->c1);
+    fprintf(archivo,"\n      Peso 2 = %.10lf", p_resultados->c2);
+    fprintf(archivo,"\n      Media 1 = %.10lf", p_resultados->mean1);
+    fprintf(archivo,"\n      Media 2 = %.10lf", p_resultados->mean2);
+    fprintf(archivo,"\n      Varianza 1 = %.10lf", p_resultados->var1);
+    fprintf(archivo,"\n      Varianza 2 = %.10lf\n", p_resultados->var2);
+
+    fprintf(archivo,"\n------------------------------------------------------------------\n");
+    fprintf(archivo,"\nResultados segun el algoritmo de Kurita:");
+    fprintf(archivo,"\n\n      Umbral optimo: %d\n", p_resultados->th_kurita);
+    fprintf(archivo,"\n      Peso 1 = %.10lf", p_resultados->c1);
+    fprintf(archivo,"\n      Peso 2 = %.10lf", p_resultados->c2);
+    fprintf(archivo,"\n      Media 1 = %.10lf", p_resultados->mean1);
+    fprintf(archivo,"\n      Media 2 = %.10lf", p_resultados->mean2);
+    fprintf(archivo,"\n      Varianza 1 = %.10lf", p_resultados->var1);
+    fprintf(archivo,"\n      Varianza 2 = %.10lf\n", p_resultados->var2);
+    fprintf(archivo,"\n      Varianza w = %.10lf\n", p_resultados->varw);
+
+    fprintf(archivo,"\n------------------------------------------------------------------\n");
+    fprintf(archivo,"\nResultados segun el algoritmo de Otsu:");
+    fprintf(archivo,"\n\n      Umbral optimo: %d\n", p_resultados->th_otsu);
+    fprintf(archivo,"\n      Peso 1 = %.10lf", p_resultados->c1);
+    fprintf(archivo,"\n      Peso 2 = %.10lf", p_resultados->c2);
+    fprintf(archivo,"\n      Media 1 = %.10lf", p_resultados->mean1);
+    fprintf(archivo,"\n      Media 2 = %.10lf", p_resultados->mean2);
+    fprintf(archivo,"\n      Varianza 1 = %.10lf", p_resultados->var1);
+    fprintf(archivo,"\n      Varianza 2 = %.10lf\n", p_resultados->var2);
+    fprintf(archivo,"\n      Varianza w = %.10lf\n", p_resultados->varw);
+    fprintf(archivo,"\n------------------------------------------------------------------\n");
+
+    fprintf(archivo,"\nResultados segun el metodo del Prof.Dr.Ing.Geovanni Martinez:");
+    if(p_resultados->th_martinez==p_resultados->th_kittler){
+        fprintf(archivo,"\n\n      El umbral optimo corresponde al umbral segun Kittler: %d\n", p_resultados->th_martinez);
+    }
+    else if(p_resultados->th_martinez==p_resultados->th_kurita){
+        fprintf(archivo,"\n\n      El umbral optimo corresponde al umbral segun Kurita: %d\n", p_resultados->th_martinez);
+    }
+    else if(p_resultados->th_martinez==p_resultados->th_otsu){
+        fprintf(archivo,"\n\n      El umbral optimo corresponde al umbral segun Otsu: %d\n", p_resultados->th_martinez);
+    }
+    fprintf(archivo,"------------------------------------------------------------------\n");
+
+    //Cerrando archivo
+    fclose(archivo);
+}
+
 
 struct BMPHeader
 {
