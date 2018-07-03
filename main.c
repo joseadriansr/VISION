@@ -57,6 +57,9 @@ double jsrMartinez_pmKurita(int n);
 double jsrMartinez_pmOtsu(int n);
 double jsrMartinez_pmKittler(int n);
 void jsrMartinez_mse();
+
+void jsrSobelMask();
+void jsrBordes(int u);
 //  ------------------------------------------------------------------------------------------
 //  STRUCTS (CONTENEDORES)
 //  ------------------------------------------------------------------------------------------
@@ -69,6 +72,16 @@ struct pInputImage
     unsigned char *prgb; //imagen rgb de entrada
     unsigned char *pintensity; //imagen de intensidad
     unsigned char *pthresholdedIntensity; //imagen resultado
+
+    double *pGradientesX; //gradientes en X
+    unsigned char *pImagenGradientesX; //imagen de gradientes
+
+    double *pGradientesY; //gradientes en Y
+    unsigned char *pImagenGradientesY; //imagen de gradientes
+
+    double *pMagnitudGradientes; //magnitud de los gradientes double
+    unsigned char *pImagenMagnitudGradientes;
+    unsigned char *pImagenBordes;
 };
 
 //Contenedor de parametros de control
@@ -174,11 +187,28 @@ int main()
     pInputImage->pintensity =(unsigned char*)malloc(sizeof(unsigned char)*width*height);
     pInputImage->pthresholdedIntensity =(unsigned char*)malloc(sizeof(unsigned char)*width*height);
 
+    pInputImage->pGradientesX =(double*)malloc(sizeof(double)*width*height);
+    pInputImage->pGradientesY =(double*)malloc(sizeof(double)*width*height);
+
+    pInputImage->pImagenGradientesX =(unsigned char*)malloc(sizeof(unsigned char)*width*height);
+    pInputImage->pImagenGradientesY =(unsigned char*)malloc(sizeof(unsigned char)*width*height);
+
+    pInputImage->pMagnitudGradientes =(double*)malloc(sizeof(double)*width*height);
+    pInputImage->pImagenMagnitudGradientes =(unsigned char*)malloc(sizeof(unsigned char)*width*height);
+    pInputImage->pImagenBordes =(unsigned char*)malloc(sizeof(unsigned char)*width*height);
+
     //Cada píxel se inicializa en cero
     for (i=0;i<width*height*3;i++) pInputImage->prgb[i]=0;
     for (i=0;i<width*height;i++) {
         pInputImage->pintensity[i]=0;
         pInputImage->pthresholdedIntensity[i]=0;
+        pInputImage->pGradientesX[i]=0.0;
+        pInputImage->pGradientesY[i]=0.0;
+        pInputImage->pImagenGradientesX[i]=0;
+        pInputImage->pImagenGradientesY[i]=0;
+        pInputImage->pMagnitudGradientes[i]=0.0;
+        pInputImage->pImagenMagnitudGradientes[i]=0;
+        pInputImage->pImagenBordes[i]=0;
     }
 
     //Leyendo la imagen RGB de archivo en formato BMP
@@ -194,6 +224,13 @@ int main()
     free(pInputImage);
     free(p_parametros);
     free(p_resultados);
+    free(pInputImage->pGradientesX);
+    free(pInputImage->pGradientesY);
+    free(pInputImage->pImagenGradientesX);
+    free(pInputImage->pImagenGradientesY);
+    free(pInputImage->pMagnitudGradientes);
+    free(pInputImage->pImagenMagnitudGradientes);
+    free(pInputImage->pImagenBordes);
 
     return 0;
 }
@@ -302,6 +339,29 @@ void geoInsertYourCodeHere()
     printf("\n------------------------------------------------------------------\n");
 
     geoSalvarResultadosEnArchivoDeTexto();
+    printf("\n... Guardando los resultados en un archivo .txt ...\n");
+    printf("\n------------------------------------------------------------------\n");
+
+    jsrSobelMask();
+    printf("\n... Calculando la imagen de gradientes en X ...\n");
+    printf("\n... Calculando la imagen de gradientes en Y ...\n");
+
+    strcpy(pathAndFileName,"output/imagenGradientesX.bmp");
+    SaveIntensityImageIn_BMP_file(pInputImage->pImagenGradientesX, pathAndFileName);
+
+    strcpy(pathAndFileName,"output/imagenGradientesY.bmp");
+    SaveIntensityImageIn_BMP_file(pInputImage->pImagenGradientesY, pathAndFileName);
+    printf("\n------------------------------------------------------------------\n");
+
+    int u = 10;
+    jsrBordes(u);
+    printf("\n... Calculando la magnitud de los gradientes ...\n");
+    printf("\n... Calculando la imagen de bordes con un umbral u=%d ...\n",u);
+
+    strcpy(pathAndFileName,"output/imagenBordes.bmp");
+    SaveIntensityImageIn_BMP_file(pInputImage->pImagenBordes, pathAndFileName);
+    printf("\n------------------------------------------------------------------\n");
+
 }
 
 //  ------------------------------------------------------------------------------------------
@@ -316,7 +376,7 @@ void geoInsertYourCodeHere()
 //  FUNCION PARA OBTENER EL HISTOGRAMA DE LA IMAGEN DE INTENSIDAD
 //  ------------------------------------------------------------------------------------------
 void jsrGetHistogram(){
-    printf("\nCalculando histograma h(n) ...");
+    printf("\n... Calculando histograma h(n) ...");
     int k; int q; int g; //Variables auxiliares
     for(g=0; g<256; g++){
         p_resultados->hist[g]=0;
@@ -334,7 +394,7 @@ void jsrGetHistogram(){
 //  FUNCION PARA OBTENER LA PROBABILIDAD p(n) DE CADA ELEMENTO DE LA IMAGEN
 //  ------------------------------------------------------------------------------------------
 void jsrGetProbability(){
-    printf("\nCalculando las probabilidades p(n) ...");
+    printf("\n... Calculando las probabilidades p(n) ...");
     int k;
     for(k=0; k<256; k++){
         p_resultados->prob[k] = (double)p_resultados->hist[k]/(double)p_resultados->N;
@@ -633,10 +693,10 @@ void jsrImageSegmentation(int th){
     int n;
     for(n=0;n<p_resultados->N;n++){
         if(pInputImage->pintensity[n]<=(unsigned char)th){
-            pInputImage->pthresholdedIntensity[n] = 0;
+            pInputImage->pthresholdedIntensity[n] = 255;
         }
         else{
-            pInputImage->pthresholdedIntensity[n] = 255;
+            pInputImage->pthresholdedIntensity[n] = 0;
         }
     }
 }
@@ -726,6 +786,83 @@ void jsrMartinez_mse(){
     p_resultados->mseOtsu = p_resultados->mseOtsu/256.0;
 }
 
+
+//  ------------------------------------------------------------------------------------------
+//  FUNCION PARA APLICAR LA MASCARA DE SOBEL EN X Y EN Y
+//  ------------------------------------------------------------------------------------------
+void jsrSobelMask(){
+    int y; int x; int b; int i; int c; int p; int f; //Contadores
+    int w = pInputImage->width; int h = pInputImage->height; //Para simplificar la lectura
+    double pY[w*h]; //Para simplificar la lectura
+    for(b=0;b<w*h;b++){
+        pY[b] = (double)pInputImage->pintensity[b]; //La imagen de gradientes es double, se hace casting a la imagen de intensidad
+    }
+    //Calculando los gradientes en X
+    for(y=1;y<h-1;y++){
+        for(x=1;x<w-1;x++){
+            pInputImage->pGradientesX[y*w+x] = (1.0/8.0)*( pY[(y+1)*w+(x+1)] +2.0*pY[y*w+(x+1)] +pY[(y-1)*w+(x+1)] -pY[(y+1)*w+(x-1)] -2.0*pY[y*w+(x-1)] -pY[(y-1)*w+(x-1)] );
+        }
+    }
+    //Calculando los gradientes en Y
+    for(i=1; i<h-1; i++){
+        for(c=1; c<w-1; c++){
+            pInputImage->pGradientesY[i*w+c] = (1.0/8.0)*( pY[(i+1)*w+(c-1)] +2.0*pY[(i+1)*w+c] +pY[(i+1)*w+(c+1)] -pY[(i-1)*w+(c-1)] -2.0*pY[(i-1)*w+c] -pY[(i-1)*w+(c+1)] );
+        }
+    }
+    //Calculando los valores unsigned char necesarios para las imagenes
+    for(p=0; p<w*h; p++){
+        if(pInputImage->pGradientesX[p]<=0.0){
+            pInputImage->pImagenGradientesX[p] = 0;
+        }
+        else if(pInputImage->pGradientesX[p]>=255.0){
+            pInputImage->pImagenGradientesX[p] = 255;
+        }
+        else{
+            pInputImage->pImagenGradientesX[p] = (unsigned char)pInputImage->pGradientesX[p];
+        }
+    }
+    for(f=0; f<w*h; f++){
+        if(pInputImage->pGradientesY[f]<=0.0){
+            pInputImage->pImagenGradientesY[f] = 0;
+        }
+        else if(pInputImage->pGradientesY[f]>=255.0){
+            pInputImage->pImagenGradientesY[f] = 255;
+        }
+        else{
+            pInputImage->pImagenGradientesY[f] = (unsigned char)pInputImage->pGradientesY[f];
+        }
+    }
+}
+
+//  ------------------------------------------------------------------------------------------
+//  FUNCION PARA CALCULAR LA MAGNITUD DE LOS GRADIENTES Y LOS BORDES
+//  ------------------------------------------------------------------------------------------
+void jsrBordes(int u){
+    int n; int z; int j;
+    for(n=0; n<p_parametros->height*p_parametros->width; n++){
+        pInputImage->pMagnitudGradientes[n] = sqrt( pInputImage->pGradientesX[n]*pInputImage->pGradientesX[n] + pInputImage->pGradientesY[n]*pInputImage->pGradientesY[n] );
+    }
+    for(z=0; z<p_parametros->height*p_parametros->width; z++){
+        if(pInputImage->pMagnitudGradientes[z]>=255.0){
+            pInputImage->pImagenMagnitudGradientes[z] = 255;
+        }
+        else if(pInputImage->pMagnitudGradientes[z]<=0.0){
+            pInputImage->pImagenMagnitudGradientes[z] = 0;
+        }
+        else{
+            pInputImage->pImagenMagnitudGradientes[z] = (unsigned char)pInputImage->pMagnitudGradientes[z];
+        }
+    }
+    for(j=0; j<p_parametros->height*p_parametros->width; j++){
+        if(pInputImage->pImagenMagnitudGradientes[j] >= u){
+            pInputImage->pImagenBordes[j] = 255;
+        }
+        else{
+            pInputImage->pImagenBordes[j] = 0;
+        }
+    }
+}
+
 //  ------------------------------------------------------------------------------------------
 //  ------------------------------------------------------------------------------------------
 //  ------------------------------------------------------------------------------------------
@@ -768,9 +905,9 @@ void geoLeerParametrosDeControlDeArchivoDeTexto()
     printf("Leyendo los datos de entrada:\n");
 
     //Abriendo archivo en mode de lectura
-//    char nombreDeArchivo[256]="current_control_parameters.txt";  //Para la imagen del cuadro
+    char nombreDeArchivo[256]="current_control_parameters.txt";  //Para la imagen del cuadro
 //    char nombreDeArchivo[256]="current_control_parameters1.txt"; //Para la imagen de Claire
-    char nombreDeArchivo[256]="current_control_parameters2.txt"; //Para la imagen de las palmeras
+//    char nombreDeArchivo[256]="current_control_parameters2.txt"; //Para la imagen de las palmeras
     archivo = fopen(nombreDeArchivo, "r");
     if (!archivo) {
         printf("No se pudo abrir el archivo: current_control_parameters.txt\n");
