@@ -361,6 +361,8 @@ void geoInsertYourCodeHere()
     strcpy(pathAndFileName,"output/imagenBordes.bmp");
     SaveIntensityImageIn_BMP_file(pInputImage->pImagenBordes, pathAndFileName);
     printf("\n------------------------------------------------------------------\n");
+    printf("\nPara ver los resultados, abra la carpeta /output \n");
+    printf("\n------------------------------------------------------------------\n");
 
 }
 
@@ -640,7 +642,7 @@ void jsrGetMean1(int th){
     p_resultados->mean1=0.0;
     if(p_resultados->c1 != 0.0){
         for(n=0; n<=th; n++){
-            p_resultados->mean1 += (n*p_resultados->prob[n]);
+            p_resultados->mean1 += ((double)n*p_resultados->prob[n]);
         }
         p_resultados->mean1 = p_resultados->mean1/p_resultados->c1;
     }
@@ -650,7 +652,7 @@ void jsrGetMean2(int th){
     p_resultados->mean2=0.0;
     if(p_resultados->c2!=0.0){
         for(n=th+1; n<256; n++){
-            p_resultados->mean2 += (n*p_resultados->prob[n]);
+            p_resultados->mean2 += ((double)n*p_resultados->prob[n]);
         }
         p_resultados->mean2 = p_resultados->mean2/p_resultados->c2;
     }
@@ -663,7 +665,7 @@ void jsrGetVariance1(int th){
     p_resultados->var1=0.0;
     if(p_resultados->c1!=0.0){
         for(n=0; n<=th; n++){
-            p_resultados->var1 += (n-p_resultados->mean1)*(n-p_resultados->mean1)*p_resultados->prob[n];
+            p_resultados->var1 += ((double)n-p_resultados->mean1)*((double)n-p_resultados->mean1)*p_resultados->prob[n];
         }
         p_resultados->var1 = p_resultados->var1/p_resultados->c1;
     }
@@ -673,7 +675,7 @@ void jsrGetVariance2(int th){
     p_resultados->var2=0.0;
     if(p_resultados->c2!=0.0){
         for(n=th+1; n<256; n++){
-            p_resultados->var2 += (n-p_resultados->mean2)*(n-p_resultados->mean2)*p_resultados->prob[n];
+            p_resultados->var2 += ((double)n-p_resultados->mean2)*((double)n-p_resultados->mean2)*p_resultados->prob[n];
         }
         p_resultados->var2 = p_resultados->var2/p_resultados->c2;
     }
